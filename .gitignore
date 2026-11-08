@@ -1,0 +1,11 @@
+.metadata/
+
+# Local SQLite database and temporary files
+*.db
+*.db-*
+
+# Generated build files
+target/
+
+# macOS files
+.DS_Store
