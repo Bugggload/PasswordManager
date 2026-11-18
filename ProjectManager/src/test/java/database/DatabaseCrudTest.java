@@ -94,6 +94,41 @@ class DatabaseCrudTest
 
 
 
+    // Deleting a user CASCADES: their passwords go too, other users' passwords stay
+
+    @Test
+    void deleteUserAlsoDeletesTheirPasswordsButNoOneElses() throws SQLException
+    {
+        PasswordTableDML.insertPassword(newEntry(user));
+        PasswordTableDML.insertPassword(newEntry(user));
+
+        User other = new User("sam@example.com", "Sam", "Lee", null);
+
+        UserTableDML.insertUser(other);
+        PasswordTableDML.insertPassword(newEntry(other));
+
+        UserTableDML.deleteUser(user.getUserID());
+
+        assertTrue(PasswordTableDQL.getPasswordsByUserID(user.getUserID()).isEmpty());
+        assertEquals(1, PasswordTableDQL.getPasswordsByUserID(other.getUserID()).size());
+    }
+
+
+
+
+    // The foreign key still does its normal job: no passwords for users that don't exist
+
+    @Test
+    void cannotInsertPasswordForMissingUser()
+    {
+        Password orphan = new Password(9999, "Orphan", "x", "x", null, null);
+
+        assertThrows(SQLException.class, () -> PasswordTableDML.insertPassword(orphan));
+    }
+
+
+
+
     // ---------- Users: lookups ----------
 
     @Test

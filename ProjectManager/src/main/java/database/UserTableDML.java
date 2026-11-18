@@ -2,7 +2,8 @@
 This class has three methods:
 1) public static int insertUser(User user): Adds a new user, stores the new ID in the user object and returns it
 2) public static void updateUser(User user): Uses user id to update the user's information
-3) public static void deleteUser(int userID): Uses user id to remove the user
+3) public static void deleteUser(int userID): Uses user id to remove the user.
+   WARNING: this also permanently deletes ALL of that user's password entries (ON DELETE CASCADE).
 
 updateUser and deleteUser throw RecordNotFoundException if no user has that ID.
  */

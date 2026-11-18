@@ -39,7 +39,7 @@ It handles the database side of the program.
 5) UserTableDML
 	- *public static int insertUser(User user)*: Adds a new user, sets its new ID on the user and returns it
 	- *public static void updateUser(User user)*: Uses user id to update the user's information
-	- *public static void deleteUser(int userID)*: Uses user id to remove the user
+	- *public static void deleteUser(int userID)*: Uses user id to remove the user. **Also deletes all of that user's password entries** (ON DELETE CASCADE)
 	- update/delete throw *RecordNotFoundException* if no user has that ID
       
 6) UserTableDQL

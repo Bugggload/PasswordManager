@@ -1,7 +1,7 @@
 /*
 This class defines:
 1) public static Connection getConnection(): Connects to the passwordmanager database and
-					creates a user and password table if they are not already there
+					makes sure its tables are up to date (see SchemaMigrator)
 2) public static Path getDatabasePath() / setDatabasePath(Path): Which database file is used
 
 Where the database lives (first match wins):
@@ -62,32 +62,14 @@ public class DatabaseConnection {
 
         Connection connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
 
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("PRAGMA foreign_keys = ON");
+        try {
+            // Foreign keys are OFF by default in SQLite and must be turned on for every connection
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("PRAGMA foreign_keys = ON");
+            }
 
-            statement.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS PasswordManagerUsers (" +
-                "PKUserID INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "Email TEXT NOT NULL UNIQUE, " +
-                "FirstName TEXT NOT NULL, " +
-                "LastName TEXT NOT NULL, " +
-                "Remarks TEXT" +
-                ")"
-            );
-
-            statement.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS PasswordManagerPasswords (" +
-                "PKPasswordID INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "FKUserID INTEGER NOT NULL, " +
-                "Title TEXT NOT NULL, " +
-                "Username TEXT NOT NULL, " +
-                "Password TEXT NOT NULL, " +
-                "URL TEXT, " +
-                "Remarks TEXT, " +
-                "FOREIGN KEY (FKUserID) " +
-                "REFERENCES PasswordManagerUsers(PKUserID)" +
-                ")"
-            );
+            // Create tables / apply any schema changes this database hasn't had yet
+            SchemaMigrator.migrate(connection);
 
         } catch (SQLException e) {
             try {
