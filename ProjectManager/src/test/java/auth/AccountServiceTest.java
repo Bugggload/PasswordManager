@@ -1,14 +1,10 @@
-/*
-Tests for AccountService.register (Step 10).
-
-Run everything:        mvn test -Dtest=AccountServiceTest
-Run one group:         mvn test -Dtest='AccountServiceTest$Validation*'
-
-Suggested order: TODO 5 (vaultKeyAad) first since it's tiny, then the register groups.
- */
-
 package auth;
 
+import database.dql.UserTableDQL;
+import database.dql.UserVaultTableDQL;
+import exceptions.DecryptionException;
+import models.User;
+import models.UserVault;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,13 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import crypto.CryptoService;
-import crypto.DecryptionException;
 import crypto.KdfParams;
-import dataHoldingClasses.User;
-import dataHoldingClasses.UserVault;
 import database.DatabaseConnection;
-import database.UserTableDQL;
-import database.UserVaultTableDQL;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -74,7 +65,7 @@ class AccountServiceTest
 
 
     @Nested
-    class Todo5_VaultKeyAad
+    class VaultKeyAad
     {
         @Test
         void sameUserGivesSameBytes()

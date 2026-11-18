@@ -18,62 +18,85 @@ To resolve it:
 
 
 
-# Packages
+# How to use it (start here)
+A UI should only ever call the **`auth`** package. Everything below it (crypto, database) is plumbing.
 
-## 1) database
-It handles the database side of the program.
-**Available methods**
-1) database.DataConnection
-  - *public static Connection getConnection()*: Connects to the database and creating the tables if not present
+```java
+// Create an account
+AccountService.register(new User("alex@example.com", "Alex", "Smith", null), masterPassword);
 
-2) PasswordTableDML
-	- *public static int insertPassword(Password entry)*: Adds a new password entry, sets its new ID on the entry and returns it
-	- *public static void updatePassword(Password entry)*: Uses password id and user id to update the entry's information
-	- *public static void deletePassword(int passwordID, int userID)*: Uses password id and user id to remove one entry
-	- update/delete throw *RecordNotFoundException* if the entry doesn't exist or belongs to another user
+// Log in: try-with-resources locks the session (wipes the key) automatically at the end
+try (AuthenticatedSession session = AccountService.login("alex@example.com", masterPassword)) {
 
+    Password entry = VaultService.addEntry(session, "Bank", "alex", "hunter2".toCharArray(), "https://bank.example", null);
 
-3) PasswordTableDQL
-	- *public static ArrayList<Password> getPasswordsByUserID(int userID)*: Takes in the user id and returns all the password entries associated with the id in an array
+    List<Password> all = VaultService.listEntries(session);          // titles readable, passwords still encrypted
 
-5) UserTableDML
-	- *public static int insertUser(User user)*: Adds a new user, sets its new ID on the user and returns it
-	- *public static void updateUser(User user)*: Uses user id to update the user's information
-	- *public static void deleteUser(int userID)*: Uses user id to remove the user. **Also deletes all of that user's password entries** (ON DELETE CASCADE)
-	- update/delete throw *RecordNotFoundException* if no user has that ID
-      
-*Every DML method also has a version that takes a `Connection` first (e.g. `insertUser(connection, user)`), for use inside a transaction.*
+    char[] plain = VaultService.revealPassword(session, entry.getPasswordID());
+    // ... show it ...
+    CryptoService.wipe(plain);                                         // then wipe it
 
-6) UserTableDQL
-	- *public static Optional<User> getUserByID(int userID)*: Finds a user by ID
-	- *public static Optional<User> getUserByEmail(String email)*: Finds a user by email (used for login)
-	- Both return *Optional.empty()* when no user matches
+    VaultService.updateEntry(session, entry.getPasswordID(), "Bank", "alex", null, null, null);  // null password = keep
+    VaultService.deleteEntry(session, entry.getPasswordID());
 
-7) TransactionRunner
-	- *public static <T> T inTransaction(SqlWork<T> work)*: Runs several operations as one all-or-nothing transaction. Pass the given connection to every operation inside it.
+    AccountService.changeMasterPassword(session, masterPassword, newMasterPassword);
+}
+CryptoService.wipe(masterPassword);   // the caller owns password arrays and wipes them
+```
 
-8) UserVaultTableDML / UserVaultTableDQL
-	- *insertVault(UserVault vault)*: Saves a new user's vault (salt, KDF settings, encrypted vault key)
-	- *updateVault(UserVault vault)*: Replaces it (used when the master password changes)
-	- *getVaultByUserID(int userID)*: Returns *Optional<UserVault>*
-	- Deleting a user deletes their vault automatically
+| Situation | What you get |
+|---|---|
+| Wrong email or wrong master password | `InvalidCredentialsException` (same message for both, on purpose) |
+| Session locked (logged out, or idle > 10 min) | `SessionLockedException`: log in again |
+| Entry doesn't exist / belongs to someone else | `RecordNotFoundException` |
+| Stored data was tampered with | `DecryptionException` |
+| Bad input (invalid email/URL, too long, empty) | `IllegalArgumentException` with a message safe to show |
 
-**These classes only store bytes. Encryption/decryption is done by `crypto.CryptoService`, never by the database classes. Passwords are stored as `PasswordCiphertext` + `PasswordNonce`; there is no plaintext password column.**
+# Security design
+- **Master password → key:** Argon2id (64 MiB, 3 passes) with a random per-user salt. The master password is never stored.
+- **Envelope encryption:** each user has a random 256-bit *vault key*. It's stored encrypted with the key derived from the master password. Changing the master password only re-encrypts the vault key.
+- **Passwords:** AES-256-GCM with a fresh random nonce per encryption. Tampering is detected. Ciphertext is bound to its owner (AAD), so copying it between users fails.
+- **Access control:** `VaultService` takes the user ID from the session, never from a parameter.
+- **Memory:** keys and passwords are `byte[]`/`char[]` and are wiped after use. Sessions wipe their key on lock/logout/idle timeout.
+- **No recovery:** a forgotten master password means the vault cannot be opened. There is no backdoor.
+- **Plaintext columns:** title, username, URL and remarks are NOT encrypted (only the password is).
 
+# Project structure
+All code is under `ProjectManager/src/main/java`:
 
-## 2) dataHoldingClasses
-These classes holds all the data we store about a user or password in the respective tables. The variables here are surjective to the columns of the tables. It also has the getters and setters for each variable.
+```
+auth/           Public API: what a UI calls
+  AccountService        register, login, changeMasterPassword, deleteAccount
+  VaultService          addEntry, listEntries, revealPassword, updateEntry, deleteEntry
+  AuthenticatedSession  logged-in user + unlocked vault key; lock()/close() logs out
 
-1) Password
-	- Variables: passwordID, userID, title, username, password, url, remarks
-    - Methods: Getters, setters and a parameterized constructor (*Password(int userID, String title, String username, String password, String url, String remarks)*)
+crypto/         Cryptography (no database access)
+  CryptoService         Argon2id, AES-256-GCM, random bytes, wipe
+  KdfParams             Argon2id cost settings
+  EncryptedData         nonce + ciphertext/tag
 
-2) User
-	- Variables: userID, email, firstName, lastName, Remarks
-    - Methods: Getters, setters and a parameterized constructor (*User(String email, String firstName, String lastName, String remarks)*)
+database/       Connection, schema and transactions
+  DatabaseConnection    connection, DB location, shared helpers (generated IDs, row-count checks)
+  SchemaMigrator        versioned migrations (PRAGMA user_version)
+  TransactionRunner     all-or-nothing groups of operations
+  dml/                  UserTableDML, PasswordTableDML, UserVaultTableDML   (insert/update/delete)
+  dql/                  UserTableDQL, PasswordTableDQL, UserVaultTableDQL   (select)
 
+models/         One class per table row
+  User, Password, UserVault
+  FieldRules            validation (email, URL, length limits)
 
-## 3) Tests
+exceptions/     DecryptionException, InvalidCredentialsException, RecordNotFoundException, SessionLockedException
+```
+
+Notes:
+- The database classes only store bytes; they never encrypt or decrypt. There is no plaintext password column.
+- Every DML method has an overload that takes a `Connection` first, for use inside `TransactionRunner.inTransaction`.
+- Update/delete throw `RecordNotFoundException` when no row matches (missing ID or another user's record).
+- Deleting a user also deletes their vault and all their passwords (ON DELETE CASCADE).
+- Emails are trimmed and lowercased, so "Alex@Example.com" and "alex@example.com" are the same account.
+
+# Tests
 Tests live in `src/test/java` and use JUnit 5. Each test runs against its own temporary database, so your real data is never touched.
 
 - **Eclipse:** right-click the project (or a test file) → **Run As → JUnit Test**. A green bar means everything passed.
@@ -81,7 +104,9 @@ Tests live in `src/test/java` and use JUnit 5. Each test runs against its own te
 
 If a test fails, Maven prints which one and why, and the build fails.
 
-## Database location
+`HygieneTest` fails the build if program code uses `System.out`, `System.err` or `printStackTrace`, because console output is how secrets usually leak.
+
+# Database location
 By default the database is stored at `<your home folder>/.passwordmanager/passwordmanager.db`.
 To use a different file, start Java with `-Dpasswordmanager.db=/path/to/file.db`.
 

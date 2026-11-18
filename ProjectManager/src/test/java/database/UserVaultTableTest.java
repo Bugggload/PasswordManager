@@ -1,10 +1,11 @@
-/*
-Tests for UserVaultTableDML / UserVaultTableDQL: storing and loading a user's vault.
-Uses fake bytes: this layer only stores data, it never encrypts.
- */
-
 package database;
 
+import database.dml.UserTableDML;
+import database.dml.UserVaultTableDML;
+import database.dql.UserVaultTableDQL;
+import exceptions.RecordNotFoundException;
+import models.User;
+import models.UserVault;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,8 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import crypto.EncryptedData;
 import crypto.KdfParams;
-import dataHoldingClasses.User;
-import dataHoldingClasses.UserVault;
 
 import java.nio.file.Path;
 import java.sql.SQLException;

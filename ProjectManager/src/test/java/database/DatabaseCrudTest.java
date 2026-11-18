@@ -1,14 +1,12 @@
-/*
-JUnit 5 tests for the user and password tables.
-
-Run all tests:   mvn test        (or in Eclipse: right-click this file -> Run As -> JUnit Test)
-
-Each test gets its own brand-new, empty database in a temporary folder,
-so tests can't affect each other or your real database.
- */
-
 package database;
 
+import database.dml.PasswordTableDML;
+import database.dml.UserTableDML;
+import database.dql.PasswordTableDQL;
+import database.dql.UserTableDQL;
+import exceptions.RecordNotFoundException;
+import models.Password;
+import models.User;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -16,8 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import crypto.EncryptedData;
-import dataHoldingClasses.Password;
-import dataHoldingClasses.User;
 
 import java.nio.file.Path;
 import java.sql.SQLException;

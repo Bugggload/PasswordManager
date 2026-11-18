@@ -1,15 +1,15 @@
-/*
-Tests for TransactionRunner: all-or-nothing behaviour.
- */
-
 package database;
 
+import database.dml.PasswordTableDML;
+import database.dml.UserTableDML;
+import database.dql.PasswordTableDQL;
+import database.dql.UserTableDQL;
+import models.Password;
+import models.User;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dataHoldingClasses.Password;
-import dataHoldingClasses.User;
 
 import java.nio.file.Path;
 import java.sql.SQLException;

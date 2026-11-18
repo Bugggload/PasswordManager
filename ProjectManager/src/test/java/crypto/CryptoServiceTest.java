@@ -1,17 +1,6 @@
-/*
-Tests for CryptoService, grouped by TODO number. Work through them in order.
-
-Run everything:        mvn test -Dtest=CryptoServiceTest
-Run one group, e.g. 2: mvn test -Dtest='CryptoServiceTest$Todo2*'
-(Eclipse: expand the JUnit view and right-click a group -> Run)
-
-The "known answer" tests use fixed inputs whose correct outputs were checked against
-two independent implementations (Bouncy Castle + argon2-cffi, JDK + Python cryptography).
-If those pass, your code is doing the real algorithm with the right settings.
- */
-
 package crypto;
 
+import exceptions.DecryptionException;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,7 +31,7 @@ class CryptoServiceTest
 
 
     @Nested
-    class Todo1_RandomBytes
+    class RandomBytes
     {
         @Test
         void returnsTheRequestedLength()
@@ -71,7 +60,7 @@ class CryptoServiceTest
 
 
     @Nested
-    class Todo2_DeriveKey
+    class DeriveKey
     {
         static final byte[] SALT = utf8("somesaltsomesalt");   // exactly 16 bytes
 
@@ -124,7 +113,7 @@ class CryptoServiceTest
 
 
     @Nested
-    class Todo3_Encrypt
+    class Encrypt
     {
         @Test
         void outputHasNonceAndCiphertextPlusTag()
@@ -161,7 +150,7 @@ class CryptoServiceTest
 
 
     @Nested
-    class Todo4_Decrypt
+    class Decrypt
     {
         // Fixed key 00 01 02 ... 1f and nonce a0 a1 ... ab
 
@@ -248,7 +237,7 @@ class CryptoServiceTest
 
 
     @Nested
-    class Todo5_Wipe
+    class Wipe
     {
         @Test
         void wipesBytesAndChars()
@@ -277,7 +266,7 @@ class CryptoServiceTest
     // When everything above passes, this one shows the whole login idea working end to end
 
     @Nested
-    class Finale_MasterPasswordUnlocksVaultKey
+    class MasterPasswordUnlocksVaultKey
     {
         @Test
         void rightPasswordUnlocksWrongPasswordDoesNot() throws DecryptionException

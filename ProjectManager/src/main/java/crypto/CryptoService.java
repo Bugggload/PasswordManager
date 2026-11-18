@@ -1,5 +1,7 @@
 package crypto;
 
+import exceptions.DecryptionException;
+
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -12,36 +14,32 @@ import javax.crypto.spec.SecretKeySpec;
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator;
 import org.bouncycastle.crypto.params.Argon2Parameters;
 
+/** Argon2id key derivation and AES-256-GCM encryption. No database access. */
 public final class CryptoService
 {
+    public static final int KEY_LENGTH_BYTES = 32;
+    public static final int SALT_LENGTH_BYTES = 16;
+    public static final int NONCE_LENGTH_BYTES = 12;
+    public static final int TAG_LENGTH_BITS = 128;
 
-    public static final int KEY_LENGTH_BYTES = 32;     // 256-bit AES key
-    public static final int SALT_LENGTH_BYTES = 16;    // 128-bit Argon2 salt
-    public static final int NONCE_LENGTH_BYTES = 12;   // 96-bit GCM nonce (the standard size)
-    public static final int TAG_LENGTH_BITS = 128;     // 16-byte GCM authentication tag
-
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-
 
     private CryptoService()
     {
-
     }
 
-
-    /**
-     * Returns {@code length} cryptographically secure random bytes.
-     */
     public static byte[] randomBytes(int length)
     {
-        if (length <= 0) {
+        if (length <= 0)
+        {
             throw new IllegalArgumentException("Length must be greater than 0");
         }
 
-        byte[] randomBytes = new byte[length];
-        SECURE_RANDOM.nextBytes(randomBytes);
+        byte[] bytes = new byte[length];
+        SECURE_RANDOM.nextBytes(bytes);
 
-        return randomBytes;
+        return bytes;
     }
 
     public static byte[] generateSalt()
@@ -59,17 +57,22 @@ public final class CryptoService
         return randomBytes(NONCE_LENGTH_BYTES);
     }
 
-    /**
-     * Argon2id: turns a master password + salt into a 32-byte key.
-     * Same password + same salt + same params -> always the same key.
-     */
+    /** Same password + salt + params always gives the same 32-byte key. */
     public static byte[] deriveKey(char[] password, byte[] salt, KdfParams params)
     {
-        if (password == null || password.length == 0) {
+        if (password == null || password.length == 0)
+        {
             throw new IllegalArgumentException("Password cannot be empty or null");
         }
-        else if (salt == null || salt.length < SALT_LENGTH_BYTES) {
+
+        if (salt == null || salt.length < SALT_LENGTH_BYTES)
+        {
             throw new IllegalArgumentException("Salt must be " + SALT_LENGTH_BYTES + " long");
+        }
+
+        if (params == null)
+        {
+            throw new IllegalArgumentException("KDF params are required");
         }
 
         Argon2Parameters argon2Params = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
@@ -79,43 +82,31 @@ public final class CryptoService
             .withIterations(params.iterations())
             .withParallelism(params.parallelism())
             .build();
-        
-        Argon2BytesGenerator argonByteGenerator = new Argon2BytesGenerator();
-        argonByteGenerator.init(argon2Params);
+
+        Argon2BytesGenerator generator = new Argon2BytesGenerator();
+        generator.init(argon2Params);
 
         byte[] key = new byte[KEY_LENGTH_BYTES];
-        argonByteGenerator.generateBytes(password, key);
+        generator.generateBytes(password, key);
 
         return key;
     }
 
-
-    /**
-     * AES-256-GCM encryption with a brand-new random nonce.
-     *
-     * @param key       32-byte key
-     * @param plaintext bytes to protect
-     * @param aad       extra data that is NOT encrypted but must match on decrypt (may be empty, not null)
-     */
+    /** Uses a fresh random nonce every call. The ciphertext includes the 16-byte tag. */
     public static EncryptedData encrypt(byte[] key, byte[] plaintext, byte[] aad)
     {
-        if (key == null || key.length != KEY_LENGTH_BYTES) {
-            throw new IllegalArgumentException("Key must be " + KEY_LENGTH_BYTES + " long");
+        requireValidKey(key);
+
+        if (plaintext == null || aad == null)
+        {
+            throw new IllegalArgumentException("Plaintext and AAD are required (use an empty array, not null)");
         }
 
         byte[] nonce = generateNonce();
-        
-        try 
+
+        try
         {
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, nonce);
-
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
-            cipher.updateAAD(aad);
-            byte[] cipherText = cipher.doFinal(plaintext);
-
-            return new EncryptedData(nonce, cipherText);
+            return new EncryptedData(nonce, initCipher(Cipher.ENCRYPT_MODE, key, nonce, aad).doFinal(plaintext));
         }
         catch (GeneralSecurityException e)
         {
@@ -123,28 +114,19 @@ public final class CryptoService
         }
     }
 
-    /**
-     * AES-256-GCM decryption. Returns the plaintext only if the tag checks out.
-     *
-     * @throws DecryptionException wrong key, tampered data, or wrong AAD
-     */
+    /** Returns the plaintext only if the authentication tag matches. */
     public static byte[] decrypt(byte[] key, EncryptedData data, byte[] aad) throws DecryptionException
     {
-        if (key.length < KEY_LENGTH_BYTES) {
-            throw new IllegalArgumentException("Key must be " + KEY_LENGTH_BYTES + " long");
+        requireValidKey(key);
+
+        if (data == null || aad == null)
+        {
+            throw new IllegalArgumentException("Encrypted data and AAD are required");
         }
 
-        try 
+        try
         {
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, data.nonce());
-
-            cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
-            cipher.updateAAD(aad);
-            byte[] plainText = cipher.doFinal(data.ciphertext());
-
-            return plainText;
+            return initCipher(Cipher.DECRYPT_MODE, key, data.nonce(), aad).doFinal(data.ciphertext());
         }
         catch (AEADBadTagException e)
         {
@@ -156,6 +138,7 @@ public final class CryptoService
         }
     }
 
+    /** Overwrites a secret with zeros. Null-safe. */
     public static void wipe(byte[] secret)
     {
         if (secret != null)
@@ -172,4 +155,21 @@ public final class CryptoService
         }
     }
 
+    // AAD must be supplied before doFinal
+    private static Cipher initCipher(int mode, byte[] key, byte[] nonce, byte[] aad) throws GeneralSecurityException
+    {
+        Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+        cipher.init(mode, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_LENGTH_BITS, nonce));
+        cipher.updateAAD(aad);
+
+        return cipher;
+    }
+
+    private static void requireValidKey(byte[] key)
+    {
+        if (key == null || key.length != KEY_LENGTH_BYTES)
+        {
+            throw new IllegalArgumentException("Key must be " + KEY_LENGTH_BYTES + " long");
+        }
+    }
 }

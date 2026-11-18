@@ -1,13 +1,7 @@
-/*
-Tests for SchemaMigrator: does a database end up at the right version with the right tables,
-no matter what state it started in?
-
-Tests for one specific migration use SchemaMigrator.migrateTo(connection, N) on a raw
-connection, so they can check the database exactly as it was at version N.
- */
-
 package database;
 
+import models.Password;
+import models.User;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
