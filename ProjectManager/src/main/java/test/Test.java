@@ -8,6 +8,9 @@ import database.PasswordTableDQL;
 import dataHoldingClasses.User;
 import dataHoldingClasses.Password;
 
+import java.io.IOException;
+import java.nio.file.Files;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -24,6 +27,15 @@ public class Test
     {
         try
         {
+            // Use a throwaway database so tests never touch the real one
+
+            DatabaseConnection.setDatabasePath(Files.createTempDirectory("passwordmanager-test").resolve("test.db"));
+
+            System.out.println("Using test database: " + DatabaseConnection.getDatabasePath());
+
+
+
+
             // INSERT a test user
 
             String email = "test-" + UUID.randomUUID() + "@example.com";
@@ -169,7 +181,7 @@ public class Test
 
             System.out.println("All tests passed!");
         }
-        catch (SQLException | IllegalArgumentException | IllegalStateException e)
+        catch (IOException | SQLException | IllegalArgumentException | IllegalStateException e)
         {
             e.printStackTrace();
         }
