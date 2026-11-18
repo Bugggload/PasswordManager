@@ -42,10 +42,15 @@ It handles the database side of the program.
 	- *public static void deleteUser(int userID)*: Uses user id to remove the user. **Also deletes all of that user's password entries** (ON DELETE CASCADE)
 	- update/delete throw *RecordNotFoundException* if no user has that ID
       
+*Every DML method also has a version that takes a `Connection` first (e.g. `insertUser(connection, user)`), for use inside a transaction.*
+
 6) UserTableDQL
 	- *public static Optional<User> getUserByID(int userID)*: Finds a user by ID
 	- *public static Optional<User> getUserByEmail(String email)*: Finds a user by email (used for login)
 	- Both return *Optional.empty()* when no user matches
+
+7) TransactionRunner
+	- *public static <T> T inTransaction(SqlWork<T> work)*: Runs several operations as one all-or-nothing transaction. Pass the given connection to every operation inside it.
 
 ## 2) dataHoldingClasses
 These classes holds all the data we store about a user or password in the respective tables. The variables here are surjective to the columns of the tables. It also has the getters and setters for each variable.

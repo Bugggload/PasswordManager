@@ -1,11 +1,15 @@
 /*
-This class has three methods:
-1) public static int insertPassword(Password entry): Adds a new password entry, stores the new ID in the entry and returns it
-2) public static void updatePassword(Password entry): Uses password id and user id to update the entry's information
-3) public static void deletePassword(int passwordID, int userID): Uses password id and user id to remove ONE entry
+This class has three operations:
+1) insertPassword(Password entry): Adds a new password entry, stores the new ID in the entry and returns it
+2) updatePassword(Password entry): Uses password id and user id to update the entry's information
+3) deletePassword(int passwordID, int userID): Uses password id and user id to remove ONE entry
 
 updatePassword and deletePassword throw RecordNotFoundException if the entry doesn't exist
 or belongs to a different user.
+
+Each operation comes in two versions:
+  - insertPassword(entry)              opens its own connection; saved immediately
+  - insertPassword(connection, entry)  uses YOUR connection; use inside TransactionRunner.inTransaction
  */
 
 package database;
@@ -25,10 +29,17 @@ public class PasswordTableDML
 
     public static int insertPassword(Password entry) throws SQLException
     {
+        try (Connection connection = DatabaseConnection.getConnection())
+        {
+            return insertPassword(connection, entry);
+        }
+    }
+
+    public static int insertPassword(Connection connection, Password entry) throws SQLException
+    {
         String sql = "INSERT INTO PasswordManagerPasswords (FKUserID, Title, Username, Password, URL, Remarks) VALUES (?, ?, ?, ?, ?, ?)";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS))
+        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS))
         {
             // Fill the placeholders ('?') in order
 
@@ -60,10 +71,17 @@ public class PasswordTableDML
 
     public static void updatePassword(Password entry) throws SQLException
     {
+        try (Connection connection = DatabaseConnection.getConnection())
+        {
+            updatePassword(connection, entry);
+        }
+    }
+
+    public static void updatePassword(Connection connection, Password entry) throws SQLException
+    {
         String sql = "UPDATE PasswordManagerPasswords SET Title = ?, Username = ?, Password = ?, URL = ?, Remarks = ? WHERE PKPasswordID = ? AND FKUserID = ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql))
+        try (PreparedStatement statement = connection.prepareStatement(sql))
         {
             // The new information
 
@@ -93,10 +111,17 @@ public class PasswordTableDML
 
     public static void deletePassword(int passwordID, int userID) throws SQLException
     {
+        try (Connection connection = DatabaseConnection.getConnection())
+        {
+            deletePassword(connection, passwordID, userID);
+        }
+    }
+
+    public static void deletePassword(Connection connection, int passwordID, int userID) throws SQLException
+    {
         String sql = "DELETE FROM PasswordManagerPasswords WHERE PKPasswordID = ? AND FKUserID = ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql))
+        try (PreparedStatement statement = connection.prepareStatement(sql))
         {
             // Which entry to delete and who owns it
 
