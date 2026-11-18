@@ -21,6 +21,13 @@
             <version>3.54.1.0</version>
         </dependency>
 
+        <!-- Bouncy Castle: provides Argon2id (AES-GCM itself is built into the JDK) -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
+
         <!-- JUnit 5 (Jupiter): only used to compile/run tests in src/test/java -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
