@@ -4,6 +4,9 @@ This class has three operations:
 2) updatePassword(Password entry): Uses password id and user id to update the entry's information
 3) deletePassword(int passwordID, int userID): Uses password id and user id to remove ONE entry
 
+The password is stored ENCRYPTED: entry.getEncryptedPassword() goes into the
+PasswordCiphertext + PasswordNonce columns. This class never sees plaintext.
+
 updatePassword and deletePassword throw RecordNotFoundException if the entry doesn't exist
 or belongs to a different user.
 
@@ -37,7 +40,7 @@ public class PasswordTableDML
 
     public static int insertPassword(Connection connection, Password entry) throws SQLException
     {
-        String sql = "INSERT INTO PasswordManagerPasswords (FKUserID, Title, Username, Password, URL, Remarks) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO PasswordManagerPasswords (FKUserID, Title, Username, PasswordCiphertext, PasswordNonce, URL, Remarks) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS))
         {
@@ -46,9 +49,10 @@ public class PasswordTableDML
             statement.setInt(1, entry.getUserID());
             statement.setString(2, entry.getTitle());
             statement.setString(3, entry.getUsername());
-            statement.setString(4, entry.getPassword());
-            statement.setString(5, entry.getUrl());
-            statement.setString(6, entry.getRemarks());
+            statement.setBytes(4, entry.getEncryptedPassword().ciphertext());
+            statement.setBytes(5, entry.getEncryptedPassword().nonce());
+            statement.setString(6, entry.getUrl());
+            statement.setString(7, entry.getRemarks());
 
             // Save the new entry
 
@@ -79,7 +83,7 @@ public class PasswordTableDML
 
     public static void updatePassword(Connection connection, Password entry) throws SQLException
     {
-        String sql = "UPDATE PasswordManagerPasswords SET Title = ?, Username = ?, Password = ?, URL = ?, Remarks = ? WHERE PKPasswordID = ? AND FKUserID = ?";
+        String sql = "UPDATE PasswordManagerPasswords SET Title = ?, Username = ?, PasswordCiphertext = ?, PasswordNonce = ?, URL = ?, Remarks = ? WHERE PKPasswordID = ? AND FKUserID = ?";
 
         try (PreparedStatement statement = connection.prepareStatement(sql))
         {
@@ -87,14 +91,15 @@ public class PasswordTableDML
 
             statement.setString(1, entry.getTitle());
             statement.setString(2, entry.getUsername());
-            statement.setString(3, entry.getPassword());
-            statement.setString(4, entry.getUrl());
-            statement.setString(5, entry.getRemarks());
+            statement.setBytes(3, entry.getEncryptedPassword().ciphertext());   // ciphertext and nonce are
+            statement.setBytes(4, entry.getEncryptedPassword().nonce());        // always replaced together
+            statement.setString(5, entry.getUrl());
+            statement.setString(6, entry.getRemarks());
 
             // Which entry to update and who owns it
 
-            statement.setInt(6, entry.getPasswordID());
-            statement.setInt(7, entry.getUserID());
+            statement.setInt(7, entry.getPasswordID());
+            statement.setInt(8, entry.getUserID());
 
             // Save the changes and make sure exactly one entry was updated
 

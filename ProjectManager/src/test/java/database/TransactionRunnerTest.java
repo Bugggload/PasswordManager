@@ -45,7 +45,7 @@ class TransactionRunnerTest
 
         int userID = TransactionRunner.inTransaction(connection -> {
             int id = UserTableDML.insertUser(connection, user);
-            PasswordTableDML.insertPassword(connection, new Password(id, "Bank", "alex", "secret", null, null));
+            PasswordTableDML.insertPassword(connection, new Password(id, "Bank", "alex", DatabaseCrudTest.FAKE_ENCRYPTED, null, null));
             return id;
         });
 

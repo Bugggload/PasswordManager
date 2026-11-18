@@ -86,7 +86,54 @@ final class SchemaMigrator
             "CREATE INDEX IdxPasswordsByUser ON PasswordManagerPasswords (FKUserID)"
         },
 
-        // ---------- Migration 3 goes here (Step 9) ----------
+        // ---------- Migration 3: encryption ----------
+        // Plaintext passwords can't be encrypted here: encrypting needs each user's vault key,
+        // which needs their master password, which old accounts never had.
+        // So (pre-release only!) we WIPE existing accounts and passwords and start fresh.
+        {
+            // Old plaintext passwords: gone. (Dropping the table also drops its index.)
+            "DROP TABLE PasswordManagerPasswords",
+
+            // Old accounts have no master password, so they could never log in: gone.
+            "DELETE FROM PasswordManagerUsers",
+
+            // One vault per user. FKUserID is both the primary key (so max one vault per user)
+            // and the foreign key (deleting the user deletes the vault).
+            "CREATE TABLE UserVaults (" +
+            "FKUserID INTEGER PRIMARY KEY, " +
+            "KdfSalt BLOB NOT NULL, " +
+            "KdfMemoryKiB INTEGER NOT NULL, " +
+            "KdfIterations INTEGER NOT NULL, " +
+            "KdfParallelism INTEGER NOT NULL, " +
+            "VaultKeyNonce BLOB NOT NULL, " +
+            "EncryptedVaultKey BLOB NOT NULL, " +
+            "CryptoVersion INTEGER NOT NULL DEFAULT 1, " +
+            "FOREIGN KEY (FKUserID) " +
+            "REFERENCES PasswordManagerUsers(PKUserID) " +
+            "ON DELETE CASCADE" +
+            ")",
+
+            // Same as before, except Password TEXT -> PasswordCiphertext BLOB + PasswordNonce BLOB.
+            // CryptoVersion lets a future version change the encryption format without guessing.
+            "CREATE TABLE PasswordManagerPasswords (" +
+            "PKPasswordID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "FKUserID INTEGER NOT NULL, " +
+            "Title TEXT NOT NULL, " +
+            "Username TEXT NOT NULL, " +
+            "PasswordCiphertext BLOB NOT NULL, " +
+            "PasswordNonce BLOB NOT NULL, " +
+            "URL TEXT, " +
+            "Remarks TEXT, " +
+            "CryptoVersion INTEGER NOT NULL DEFAULT 1, " +
+            "FOREIGN KEY (FKUserID) " +
+            "REFERENCES PasswordManagerUsers(PKUserID) " +
+            "ON DELETE CASCADE" +
+            ")",
+
+            "CREATE INDEX IdxPasswordsByUser ON PasswordManagerPasswords (FKUserID)"
+        },
+
+        // ---------- Migration 4 goes here ----------
     };
 
 
@@ -115,6 +162,17 @@ final class SchemaMigrator
 
     static void migrate(Connection connection) throws SQLException
     {
+        migrateTo(connection, latestVersion());
+    }
+
+
+
+
+    // Bring the database up to a specific version. The app always uses migrate();
+    // tests use this to build a database "as it was" at an older version.
+
+    static void migrateTo(Connection connection, int targetVersion) throws SQLException
+    {
         int currentVersion = readVersion(connection);
 
         if (currentVersion > latestVersion())
@@ -124,7 +182,7 @@ final class SchemaMigrator
                 + " is newer than this program supports (" + latestVersion() + "). Please update the program.");
         }
 
-        for (int version = currentVersion; version < latestVersion(); version++)
+        for (int version = currentVersion; version < targetVersion; version++)
         {
             applyMigration(connection, version + 1, MIGRATIONS[version]);
         }

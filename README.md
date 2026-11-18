@@ -52,6 +52,15 @@ It handles the database side of the program.
 7) TransactionRunner
 	- *public static <T> T inTransaction(SqlWork<T> work)*: Runs several operations as one all-or-nothing transaction. Pass the given connection to every operation inside it.
 
+8) UserVaultTableDML / UserVaultTableDQL
+	- *insertVault(UserVault vault)*: Saves a new user's vault (salt, KDF settings, encrypted vault key)
+	- *updateVault(UserVault vault)*: Replaces it (used when the master password changes)
+	- *getVaultByUserID(int userID)*: Returns *Optional<UserVault>*
+	- Deleting a user deletes their vault automatically
+
+**These classes only store bytes. Encryption/decryption is done by `crypto.CryptoService`, never by the database classes. Passwords are stored as `PasswordCiphertext` + `PasswordNonce`; there is no plaintext password column.**
+
+
 ## 2) dataHoldingClasses
 These classes holds all the data we store about a user or password in the respective tables. The variables here are surjective to the columns of the tables. It also has the getters and setters for each variable.
 

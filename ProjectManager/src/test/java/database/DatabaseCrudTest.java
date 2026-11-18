@@ -9,11 +9,13 @@ so tests can't affect each other or your real database.
 
 package database;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import crypto.EncryptedData;
 import dataHoldingClasses.Password;
 import dataHoldingClasses.User;
 
@@ -34,6 +36,14 @@ class DatabaseCrudTest
     Path tempFolder;
 
     private User user;
+
+    // The database layer only STORES encrypted bytes, so tests use fixed fake bytes.
+    // (Real encryption is CryptoService's job and is tested in CryptoServiceTest.)
+    // The values include 0x00 and 0xFF to prove arbitrary binary survives the round trip.
+
+    static final EncryptedData FAKE_ENCRYPTED = new EncryptedData(
+        new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 },
+        new byte[] { (byte) 0xFF, 0x00, 0x7F, (byte) 0x80, 42 });
 
 
 
@@ -121,7 +131,7 @@ class DatabaseCrudTest
     @Test
     void cannotInsertPasswordForMissingUser()
     {
-        Password orphan = new Password(9999, "Orphan", "x", "x", null, null);
+        Password orphan = new Password(9999, "Orphan", "x", FAKE_ENCRYPTED, null, null);
 
         assertThrows(SQLException.class, () -> PasswordTableDML.insertPassword(orphan));
     }
@@ -213,7 +223,8 @@ class DatabaseCrudTest
         assertEquals(returnedID, saved.getPasswordID());
         assertEquals("Test website", saved.getTitle());
         assertEquals("alex", saved.getUsername());
-        assertEquals("FakeTestPassword", saved.getPassword());
+        assertArrayEquals(FAKE_ENCRYPTED.nonce(), saved.getEncryptedPassword().nonce(), "Nonce must come back byte-for-byte");
+        assertArrayEquals(FAKE_ENCRYPTED.ciphertext(), saved.getEncryptedPassword().ciphertext(), "Ciphertext must come back byte-for-byte");
         assertEquals("https://example.com", saved.getUrl());
         assertEquals("Test entry", saved.getRemarks());
     }
@@ -236,6 +247,28 @@ class DatabaseCrudTest
 
         assertEquals(1, passwords.size());
         assertEquals("Updated website", passwords.get(0).getTitle());
+    }
+
+
+
+
+    @Test
+    void updatePasswordReplacesCiphertextAndNonceTogether() throws SQLException
+    {
+        Password entry = newEntry(user);
+
+        PasswordTableDML.insertPassword(entry);
+
+        EncryptedData replacement = new EncryptedData(new byte[12], new byte[] { 9, 9, 9 });
+
+        entry.setEncryptedPassword(replacement);
+
+        PasswordTableDML.updatePassword(entry);
+
+        Password saved = PasswordTableDQL.getPasswordsByUserID(user.getUserID()).get(0);
+
+        assertArrayEquals(replacement.nonce(), saved.getEncryptedPassword().nonce());
+        assertArrayEquals(replacement.ciphertext(), saved.getEncryptedPassword().ciphertext());
     }
 
 
@@ -266,7 +299,7 @@ class DatabaseCrudTest
     @Test
     void updatingAMissingPasswordThrows()
     {
-        Password ghost = new Password(9999, user.getUserID(), "Ghost", "x", "x", null, null);
+        Password ghost = new Password(9999, user.getUserID(), "Ghost", "x", FAKE_ENCRYPTED, null, null);
 
         assertThrows(RecordNotFoundException.class, () -> PasswordTableDML.updatePassword(ghost));
     }
@@ -296,7 +329,7 @@ class DatabaseCrudTest
 
         // Same password ID, but the other user's ID: must not match any row
 
-        Password hijack = new Password(mine.getPasswordID(), other.getUserID(), "Hacked", "x", "x", null, null);
+        Password hijack = new Password(mine.getPasswordID(), other.getUserID(), "Hacked", "x", FAKE_ENCRYPTED, null, null);
 
         assertThrows(RecordNotFoundException.class, () -> PasswordTableDML.updatePassword(hijack));
         assertThrows(RecordNotFoundException.class, () -> PasswordTableDML.deletePassword(mine.getPasswordID(), other.getUserID()));
@@ -316,7 +349,7 @@ class DatabaseCrudTest
 
     private Password newEntry(User owner)
     {
-        return new Password(owner.getUserID(), "Test website", "alex", "FakeTestPassword", "https://example.com", "Test entry");
+        return new Password(owner.getUserID(), "Test website", "alex", FAKE_ENCRYPTED, "https://example.com", "Test entry");
     }
 
 }

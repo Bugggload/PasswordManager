@@ -2,9 +2,15 @@
  This class stores all the data we have about a password in password table.
  Each variable here is equivalent to a column in the password table.
  It also has parameterized constructor, getters and setters for each variables.
+
+ The password itself is NEVER held here as plaintext. It is stored as EncryptedData
+ (nonce + ciphertext/tag), which maps to the PasswordNonce and PasswordCiphertext columns.
+ Turning plaintext into EncryptedData (and back) is done with CryptoService, outside this class.
 */
 
 package dataHoldingClasses;
+
+import crypto.EncryptedData;
 
 
 public class Password
@@ -15,38 +21,38 @@ public class Password
     private int userID;
     private String title;
     private String username;
-    private String password;
+    private EncryptedData encryptedPassword;
     private String url;
     private String remarks;
 
 
-    
+
     // Two parameterized constructors
     //When table automatically already sets a password id (usually used)
-    public Password(int userID, String title, String username, String password, String url, String remarks)
+    public Password(int userID, String title, String username, EncryptedData encryptedPassword, String url, String remarks)
     {
         setUserID(userID);
         setTitle(title);
         setUsername(username);
-        setPassword(password);
+        setEncryptedPassword(encryptedPassword);
         setUrl(url);
         setRemarks(remarks);
     }
-    
+
     //When user id is manually set (Usually to be used when extracting data from the database)
-    public Password(int passwordID, int userID, String title, String username, String password, String url, String remarks)
+    public Password(int passwordID, int userID, String title, String username, EncryptedData encryptedPassword, String url, String remarks)
     {
     	setPasswordID(passwordID);
         setUserID(userID);
         setTitle(title);
         setUsername(username);
-        setPassword(password);
+        setEncryptedPassword(encryptedPassword);
         setUrl(url);
         setRemarks(remarks);
     }
-    
-    
-    
+
+
+
 
 
     // Getters
@@ -70,9 +76,9 @@ public class Password
         return username;
     }
 
-    public String getPassword()
+    public EncryptedData getEncryptedPassword()
     {
-        return password;
+        return encryptedPassword;
     }
 
     public String getUrl()
@@ -89,7 +95,7 @@ public class Password
 
 
     // Setters
-    
+
     public void setPasswordID(int passwordID)
     {
         if (passwordID <= 0)
@@ -99,8 +105,8 @@ public class Password
 
         this.passwordID = passwordID;
     }
-    
-    
+
+
     public void setUserID(int userID)
     {
         if (userID <= 0)
@@ -131,14 +137,14 @@ public class Password
         this.username = username;
     }
 
-    public void setPassword(String password)
+    public void setEncryptedPassword(EncryptedData encryptedPassword)
     {
-        if (password == null || password.isEmpty())
+        if (encryptedPassword == null)
         {
-            throw new IllegalArgumentException("Password cannot be null or empty.");
+            throw new IllegalArgumentException("Encrypted password cannot be null.");
         }
 
-        this.password = password;
+        this.encryptedPassword = encryptedPassword;
     }
 
     public void setUrl(String url)

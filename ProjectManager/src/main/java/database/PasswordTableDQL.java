@@ -1,13 +1,15 @@
 /*
  The function of this class is to retrieve password data from the tables. We will update it as per the need.
  Methods defined:
- 1) static ArrayList<Password> getPasswordsByUserID(int userID): Takes in the user id and returns all the password entries associated with the id in an array
+ 1) static ArrayList<Password> getPasswordsByUserID(int userID): Takes in the user id and returns all the password entries associated with the id in an array.
+    The passwords come back still ENCRYPTED; decrypt one only when the user asks to see it.
 */
 
 
 
 package database;
 
+import crypto.EncryptedData;
 import dataHoldingClasses.Password;
 
 import java.sql.Connection;
@@ -48,13 +50,15 @@ public class PasswordTableDQL
                     int passwordID = results.getInt("PKPasswordID");
                     String title = results.getString("Title");
                     String username = results.getString("Username");
-                    String password = results.getString("Password");
+                    EncryptedData encryptedPassword = new EncryptedData(
+                        results.getBytes("PasswordNonce"),
+                        results.getBytes("PasswordCiphertext"));
                     String url = results.getString("URL");
                     String remarks = results.getString("Remarks");
 
                     // Use the constructor that includes the password ID
 
-                    Password entry = new Password(passwordID, userID, title, username, password, url, remarks);
+                    Password entry = new Password(passwordID, userID, title, username, encryptedPassword, url, remarks);
 
                     passwords.add(entry);
                 }
