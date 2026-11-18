@@ -43,9 +43,9 @@ It handles the database side of the program.
 	- update/delete throw *RecordNotFoundException* if no user has that ID
       
 6) UserTableDQL
-	- None for now
-
-**UserTableDQL and PasswordTableDQL have no methods for now**
+	- *public static Optional<User> getUserByID(int userID)*: Finds a user by ID
+	- *public static Optional<User> getUserByEmail(String email)*: Finds a user by email (used for login)
+	- Both return *Optional.empty()* when no user matches
 
 ## 2) dataHoldingClasses
 These classes holds all the data we store about a user or password in the respective tables. The variables here are surjective to the columns of the tables. It also has the getters and setters for each variable.

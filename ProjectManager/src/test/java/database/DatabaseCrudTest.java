@@ -10,7 +10,6 @@ so tests can't affect each other or your real database.
 package database;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,9 +18,6 @@ import dataHoldingClasses.Password;
 import dataHoldingClasses.User;
 
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
@@ -81,7 +77,7 @@ class DatabaseCrudTest
 
         UserTableDML.updateUser(user);
 
-        assertEquals("Jamie", readFirstName(user.getUserID()));
+        assertEquals("Jamie", UserTableDQL.getUserByID(user.getUserID()).orElseThrow().getFirstName());
     }
 
 
@@ -92,7 +88,48 @@ class DatabaseCrudTest
     {
         UserTableDML.deleteUser(user.getUserID());
 
-        assertFalse(userExists(user.getUserID()));
+        assertTrue(UserTableDQL.getUserByID(user.getUserID()).isEmpty());
+    }
+
+
+
+
+    // ---------- Users: lookups ----------
+
+    @Test
+    void getUserByIDReturnsAllFields() throws SQLException
+    {
+        User found = UserTableDQL.getUserByID(user.getUserID()).orElseThrow();
+
+        assertEquals(user.getUserID(), found.getUserID());
+        assertEquals("alex@example.com", found.getEmail());
+        assertEquals("Alex", found.getFirstName());
+        assertEquals("Smith", found.getLastName());
+        assertEquals("Test user", found.getRemarks());
+    }
+
+
+
+
+    @Test
+    void getUserByEmailFindsTheRightUser() throws SQLException
+    {
+        UserTableDML.insertUser(new User("sam@example.com", "Sam", "Lee", null));
+
+        User found = UserTableDQL.getUserByEmail("alex@example.com").orElseThrow();
+
+        assertEquals(user.getUserID(), found.getUserID());
+        assertEquals("Alex", found.getFirstName());
+    }
+
+
+
+
+    @Test
+    void lookupsReturnEmptyWhenNoUserMatches() throws SQLException
+    {
+        assertTrue(UserTableDQL.getUserByID(9999).isEmpty());
+        assertTrue(UserTableDQL.getUserByEmail("nobody@example.com").isEmpty());
     }
 
 
@@ -245,29 +282,6 @@ class DatabaseCrudTest
     private Password newEntry(User owner)
     {
         return new Password(owner.getUserID(), "Test website", "alex", "FakeTestPassword", "https://example.com", "Test entry");
-    }
-
-
-    // TODO (Step 4): replace these raw queries with UserTableDQL methods
-
-    private boolean userExists(int userID) throws SQLException
-    {
-        return readFirstName(userID) != null;
-    }
-
-
-    private String readFirstName(int userID) throws SQLException
-    {
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement("SELECT FirstName FROM PasswordManagerUsers WHERE PKUserID = ?"))
-        {
-            statement.setInt(1, userID);
-
-            try (ResultSet results = statement.executeQuery())
-            {
-                return results.next() ? results.getString("FirstName") : null;
-            }
-        }
     }
 
 }
