@@ -1,8 +1,11 @@
 /*
-This class has three methods: 
-1) public void insertPassword(Password entry): Adds a new password entry in the database
-2) public void updatePassword(Password entry): Uses password id and user id to update the entry's information
-3) public void removePassword(Password entry): Uses password id to user id remove the entry's information
+This class has three methods:
+1) public static int insertPassword(Password entry): Adds a new password entry, stores the new ID in the entry and returns it
+2) public static void updatePassword(Password entry): Uses password id and user id to update the entry's information
+3) public static void deletePassword(int passwordID, int userID): Uses password id and user id to remove ONE entry
+
+updatePassword and deletePassword throw RecordNotFoundException if the entry doesn't exist
+or belongs to a different user.
  */
 
 package database;
@@ -12,19 +15,20 @@ import dataHoldingClasses.Password;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 
 public class PasswordTableDML
 {
 
-    // Adding a new password entry
+    // Adding a new password entry. Returns the generated password ID (also set on the entry).
 
-    public static void insertPassword(Password entry) throws SQLException
+    public static int insertPassword(Password entry) throws SQLException
     {
         String sql = "INSERT INTO PasswordManagerPasswords (FKUserID, Title, Username, Password, URL, Remarks) VALUES (?, ?, ?, ?, ?, ?)";
 
         try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql))
+             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS))
         {
             // Fill the placeholders ('?') in order
 
@@ -38,6 +42,14 @@ public class PasswordTableDML
             // Save the new entry
 
             statement.executeUpdate();
+
+            // Ask the database which ID it just created
+
+            int newPasswordID = SqlHelpers.readGeneratedID(statement);
+
+            entry.setPasswordID(newPasswordID);
+
+            return newPasswordID;
         }
     }
 
@@ -66,9 +78,11 @@ public class PasswordTableDML
             statement.setInt(6, entry.getPasswordID());
             statement.setInt(7, entry.getUserID());
 
-            // Save the changes
+            // Save the changes and make sure exactly one entry was updated
 
-            statement.executeUpdate();
+            int affectedRows = statement.executeUpdate();
+
+            SqlHelpers.requireOneRow(affectedRows, "No password entry " + entry.getPasswordID() + " for user " + entry.getUserID());
         }
     }
 
@@ -89,9 +103,11 @@ public class PasswordTableDML
             statement.setInt(1, passwordID);
             statement.setInt(2, userID);
 
-            // Remove the entry
+            // Remove the entry and make sure exactly one entry was removed
 
-            statement.executeUpdate();
+            int affectedRows = statement.executeUpdate();
+
+            SqlHelpers.requireOneRow(affectedRows, "No password entry " + passwordID + " for user " + userID);
         }
     }
 

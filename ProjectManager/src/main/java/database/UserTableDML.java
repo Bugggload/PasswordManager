@@ -1,8 +1,10 @@
 /*
-This class has three methods: 
-1) public void insertUser(User user): Adds a new user in the database
-2) public void updateUser(User user): Uses user id to update the user's information
-3) public void removeUser(User user): Uses user id to remove the user's information
+This class has three methods:
+1) public static int insertUser(User user): Adds a new user, stores the new ID in the user object and returns it
+2) public static void updateUser(User user): Uses user id to update the user's information
+3) public static void deleteUser(int userID): Uses user id to remove the user
+
+updateUser and deleteUser throw RecordNotFoundException if no user has that ID.
  */
 
 package database;
@@ -12,18 +14,19 @@ import dataHoldingClasses.User;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 
 public class UserTableDML
 {
 
-    // Inserting a new user
-    public static void insertUser(User user) throws SQLException
+    // Inserting a new user. Returns the generated user ID (also set on the user object).
+    public static int insertUser(User user) throws SQLException
     {
         String sql = "INSERT INTO PasswordManagerUsers (Email, FirstName, LastName, Remarks) VALUES (?, ?, ?, ?)";
 
         try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql))
+             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS))
         {
             // Filling the placeholders in order
             statement.setString(1, user.getEmail());
@@ -34,6 +37,14 @@ public class UserTableDML
             // Save the new user
 
             statement.executeUpdate();
+
+            // Ask the database which ID it just created
+
+            int newUserID = SqlHelpers.readGeneratedID(statement);
+
+            user.setUserID(newUserID);
+
+            return newUserID;
         }
     }
 
@@ -59,9 +70,11 @@ public class UserTableDML
 
             statement.setInt(5, user.getUserID());
 
-            // Save the changes
+            // Save the changes and make sure exactly one user was updated
 
-            statement.executeUpdate();
+            int affectedRows = statement.executeUpdate();
+
+            SqlHelpers.requireOneRow(affectedRows, "No user with ID " + user.getUserID());
         }
     }
 
@@ -81,9 +94,11 @@ public class UserTableDML
 
             statement.setInt(1, userID);
 
-            // Remove the user
+            // Remove the user and make sure exactly one user was removed
 
-            statement.executeUpdate();
+            int affectedRows = statement.executeUpdate();
+
+            SqlHelpers.requireOneRow(affectedRows, "No user with ID " + userID);
         }
     }
 

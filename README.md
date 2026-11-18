@@ -27,18 +27,20 @@ It handles the database side of the program.
   - *public static Connection getConnection()*: Connects to the database and creating the tables if not present
 
 2) PasswordTableDML
-	- *public void insertPassword(Password entry)*: Adds a new password entry in the database
-	- *public void updatePassword(Password entry)*: Uses password id and user id to update the entry's information
-	- *public void removePassword(Password entry)*: Uses password id to user id remove the entry's information
+	- *public static int insertPassword(Password entry)*: Adds a new password entry, sets its new ID on the entry and returns it
+	- *public static void updatePassword(Password entry)*: Uses password id and user id to update the entry's information
+	- *public static void deletePassword(int passwordID, int userID)*: Uses password id and user id to remove one entry
+	- update/delete throw *RecordNotFoundException* if the entry doesn't exist or belongs to another user
 
 
 3) PasswordTableDQL
 	- *public static ArrayList<Password> getPasswordsByUserID(int userID)*: Takes in the user id and returns all the password entries associated with the id in an array
 
 5) UserTableDML
-	- *public void insertUser(User user)*: Adds a new user in the database
-	- *public void updateUser(User user)*: Uses user id to update the user's information
-	- *public void removeUser(User user)*: Uses user id to remove the user's information
+	- *public static int insertUser(User user)*: Adds a new user, sets its new ID on the user and returns it
+	- *public static void updateUser(User user)*: Uses user id to update the user's information
+	- *public static void deleteUser(int userID)*: Uses user id to remove the user
+	- update/delete throw *RecordNotFoundException* if no user has that ID
       
 6) UserTableDQL
 	- None for now
@@ -57,13 +59,15 @@ These classes holds all the data we store about a user or password in the respec
     - Methods: Getters, setters and a parameterized constructor (*User(String email, String firstName, String lastName, String remarks)*)
 
 
-## 3)test
-To test if the setup is working. Just run Test.java to see everything is running fine. If it is, the output would be:
-PASS: Insert user.
-PASS: Update user.
-PASS: Insert and read password entry.
-PASS: Update password entry.
-PASS: Delete password entry.
-PASS: Delete user.
-All tests passed!
+## 3) Tests
+Tests live in `src/test/java` and use JUnit 5. Each test runs against its own temporary database, so your real data is never touched.
+
+- **Eclipse:** right-click the project (or a test file) → **Run As → JUnit Test**. A green bar means everything passed.
+- **Terminal:** from the `ProjectManager` folder run `mvn test`. It ends with `BUILD SUCCESS` and `Tests run: N, Failures: 0, Errors: 0`.
+
+If a test fails, Maven prints which one and why, and the build fails.
+
+## Database location
+By default the database is stored at `<your home folder>/.passwordmanager/passwordmanager.db`.
+To use a different file, start Java with `-Dpasswordmanager.db=/path/to/file.db`.
 
