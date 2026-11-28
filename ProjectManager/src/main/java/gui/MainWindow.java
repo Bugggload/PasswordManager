@@ -17,7 +17,7 @@ public class MainWindow extends JFrame {
 
 	public MainWindow() {
 		setTitle("Password Manager");
-		setSize(900, 600);
+		setSize(720, 480);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setLocationRelativeTo(null);
 		
